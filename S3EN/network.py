@@ -76,6 +76,7 @@ def create_stacking_block(input_lists, target_type, width, depth):
 
 def create_ensemble(feature_list,
                     target_type='classification',
+                    nb_cores=None,
                     enable_gpu='yes',
                     memory_growth='yes',
                     nb_models_per_stack=20,
@@ -92,23 +93,25 @@ def create_ensemble(feature_list,
         metrics = ['mae', 'mse']
 
     if enable_gpu == "yes":
-        gpu_prefix = 'XLA_GPU'
-        gpus = config.experimental.list_physical_devices(gpu_prefix)
-        if len(gpus) == 0:
-            gpu_prefix = 'GPU'
-            gpus = config.experimental.list_physical_devices(gpu_prefix)
-            if memory_growth == "yes" and len(gpus) > 0:
-                for gpu in gpus:
-                    config.experimental.set_memory_growth(gpu, True)
-        try:
-            gpus = [i.name for i in gpus]
-            gpus = [re.search(f"GPU:\d$", i).group() for i in gpus]
-        except:
-            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-            gpus = []
+        prefix = 'GPU'
     else:
+        prefix = 'CPU'
+
+    cores = config.experimental.list_physical_devices(prefix)
+    if len(cores) == 0 and enable_gpu == "yes":
+        cores = config.experimental.list_physical_devices('XLA_GPU')
+    if memory_growth == "yes" and len(cores) > 0 and enable_gpu == "yes":
+        for core in cores:
+            config.experimental.set_memory_growth(core, True)
+    try:
+        cores = [i.name for i in cores]
+        if nb_cores is not None:
+            cores = cores[:nb_cores]
+        cores = [re.search(f"{prefix}:\d$", i).group() for i in cores]
+    except:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-        gpus = []
+        cores = []
+
 
     # Set some defaults number of features to each in each sub-network
     if nb_variables_per_model is None:
@@ -124,7 +127,7 @@ def create_ensemble(feature_list,
         return sum(
             [initial_layer['outdim'] for initial_layer in layers])
 
-    strategy = distribute.MirroredStrategy(devices=gpus,
+    strategy = distribute.MirroredStrategy(devices=cores,
                         cross_device_ops=distribute.HierarchicalCopyAllReduce()
                         )
     with strategy.scope():

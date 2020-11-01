@@ -38,6 +38,8 @@ y = df['Survived'].values
 def test_shape():
     model = s3enEstimator(feature_list,
                           target_type='classification',
+                          validation_ratio=0,
+                          patience=3,
                           nb_models_per_stack=2,
                           nb_variables_per_model=2,
                           nb_stack_blocks=2,
@@ -54,6 +56,29 @@ def test_classifier_accuracy():
     model.fit(X, y)
     assert np.mean((model.predict(X) > 0.5).astype(float) == y) >= 0.75
 
+def test_classifier_accuracy_using_regression():
+    model = s3enEstimator(feature_list,
+                          target_type='regression',
+                          validation_ratio=0,
+                          patience=3,
+                          nb_models_per_stack=10,
+                          nb_variables_per_model=4,
+                          nb_stack_blocks=20,
+                          width=1,
+                          depth=1,
+                          epochs=300
+                          )
+    model.fit(X, y)
+    assert np.mean((model.predict(X) > 0.5).astype(float) == y) >= 0.75
+
+def test_classifier_accuracy_with_patience():
+    model = s3enEstimator(feature_list,
+                          target_type='classification',
+                          validation_ratio=0.2,
+                          patience=5)
+    model.fit(X, y)
+    assert np.mean((model.predict(X) > 0.5).astype(float) == y) >= 0.75
+
 def test_random_gridSearch_classifier():
     from sklearn.model_selection import RandomizedSearchCV
     grid = {
@@ -61,6 +86,8 @@ def test_random_gridSearch_classifier():
     }
     model = s3enEstimator(feature_list,
                           target_type='classification',
+                          validation_ratio=0,
+                          patience=None,
                           nb_models_per_stack=2,
                           nb_variables_per_model=2,
                           nb_stack_blocks=2,
