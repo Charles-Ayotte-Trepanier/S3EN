@@ -36,7 +36,7 @@ X = good_feats_df
 y = df['Survived'].values
 
 def test_shape():
-    model = s3enEstimator(feature_list,
+    model = s3enEstimator(feature_list=feature_list,
                           target_type='classification',
                           validation_ratio=0,
                           patience=3,

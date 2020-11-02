@@ -1,7 +1,8 @@
 from setuptools import find_packages, setup
 setup(
     name="S3EN",
-    packages=find_packages(include=["S3EN.estimator"]),
+    packages=find_packages(include=["S3EN.estimator",
+                                    "S3EN.network"]),
     version="0.1.0",
     description="My first Python library",
     author="Charles Ayotte-Trépanier",
