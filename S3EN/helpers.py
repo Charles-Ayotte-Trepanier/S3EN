@@ -33,6 +33,7 @@ def build_layers(input_dim, output_dim, width, depth, dropout_rate=0):
             layers_dim = layers_dim[:1] +\
                          [ceil(layer/(1-dropout_rate))
                           for layer in layers_dim[1:]]
+    layers_dim[-1] = output_dim
     return layers_dim
 
 def duplicate(y, duplications):
@@ -63,5 +64,9 @@ class perf_callback(Callback):
 def adjust_data(X, y, feature_list, target_replicas):
     X_adjusted = [X[col['feat_nm']].values.reshape(-1, 1) for col in
                   feature_list]
-    y_adjusted = duplicate(y, target_replicas)
+
+    if y is not None:
+        y_adjusted = duplicate(y, target_replicas)
+    else:
+        y_adjusted = None
     return X_adjusted, y_adjusted

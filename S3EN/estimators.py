@@ -17,6 +17,9 @@ class s3enEstimatorClassifier(BaseEstimator, ClassifierMixin):
                  depth=1,
                  epochs=100,
                  batch_size=128,
+                 activation='elu',
+                 batch_norm='no',
+                 dropout_rate=0,
                  sample_weight=None,
                  nb_cores=None,
                  enable_gpu='no',
@@ -31,6 +34,7 @@ class s3enEstimatorClassifier(BaseEstimator, ClassifierMixin):
         self.epochs = epochs
         self.batch_size = batch_size
         self.sample_weight = sample_weight
+        self.activation = activation
         self.nb_cores = nb_cores
         self.enable_gpu = enable_gpu
         self.memory_growth = memory_growth
@@ -39,6 +43,8 @@ class s3enEstimatorClassifier(BaseEstimator, ClassifierMixin):
         self.nb_stack_blocks = nb_stack_blocks
         self.width = width
         self.depth = depth
+        self.batch_norm = batch_norm
+        self.dropout_rate = dropout_rate
 
     def fit(self, X, y):
         """
@@ -50,16 +56,19 @@ class s3enEstimatorClassifier(BaseEstimator, ClassifierMixin):
         target_type = 'classification'
         mode = 'max'
         self.model, self.target_replicas = \
-            create_ensemble(self.feature_list,
-                            target_type,
-                            self.nb_cores,
-                            self.enable_gpu,
-                            self.memory_growth,
-                            self.nb_models_per_stack,
-                            self.nb_variables_per_model,
-                            self.nb_stack_blocks,
-                            self.width,
-                            self.depth)
+            create_ensemble(feature_list=self.feature_list,
+                            target_type=target_type,
+                            nb_cores=self.nb_cores,
+                            enable_gpu=self.enable_gpu,
+                            memory_growth=self.memory_growth,
+                            nb_models_per_stack=self.nb_models_per_stack,
+                            nb_variables_per_model=self.nb_variables_per_model,
+                            nb_stack_blocks=self.nb_stack_blocks,
+                            width=self.width,
+                            depth=self.depth,
+                            activation=self.activation,
+                            batch_norm=self.batch_norm,
+                            dropout_rate=self.dropout_rate)
 
         if self.validation_ratio > 0:
             X_train, X_val, y_train, y_val = \
@@ -103,8 +112,10 @@ class s3enEstimatorClassifier(BaseEstimator, ClassifierMixin):
         if self._fitted is not True:
             raise RuntimeError(
                 "You must train classifer before predicting data!")
-        X_adjusted = [X[col['feat_nm']].values.reshape(-1, 1) for col in
-             self.feature_list]
+        X_adjusted, _ = adjust_data(X,
+                                    y,
+                                    self.feature_list,
+                                    self.target_replicas)
         return self.model.predict(X_adjusted)[:, 0]
 
     def predict(self, X, y=None):
@@ -124,6 +135,9 @@ class s3enEstimatorRegressor(BaseEstimator, RegressorMixin):
                  depth=1,
                  epochs=100,
                  batch_size=128,
+                 activation='elu',
+                 batch_norm='no',
+                 dropout_rate=0,
                  sample_weight=None,
                  nb_cores=None,
                  enable_gpu='no',
@@ -137,6 +151,7 @@ class s3enEstimatorRegressor(BaseEstimator, RegressorMixin):
         self.patience = patience
         self.epochs = epochs
         self.batch_size = batch_size
+        self.activation = activation
         self.sample_weight = sample_weight
         self.nb_cores = nb_cores
         self.enable_gpu = enable_gpu
@@ -146,6 +161,8 @@ class s3enEstimatorRegressor(BaseEstimator, RegressorMixin):
         self.nb_stack_blocks = nb_stack_blocks
         self.width = width
         self.depth = depth
+        self.batch_norm = batch_norm
+        self.dropout_rate = dropout_rate
 
     def fit(self, X, y):
         """
@@ -157,16 +174,19 @@ class s3enEstimatorRegressor(BaseEstimator, RegressorMixin):
         target_type = 'regression'
         mode = 'min'
         self.model, self.target_replicas = \
-            create_ensemble(self.feature_list,
-                            target_type,
-                            self.nb_cores,
-                            self.enable_gpu,
-                            self.memory_growth,
-                            self.nb_models_per_stack,
-                            self.nb_variables_per_model,
-                            self.nb_stack_blocks,
-                            self.width,
-                            self.depth)
+            create_ensemble(feature_list=self.feature_list,
+                            target_type=target_type,
+                            nb_cores=self.nb_cores,
+                            enable_gpu=self.enable_gpu,
+                            memory_growth=self.memory_growth,
+                            nb_models_per_stack=self.nb_models_per_stack,
+                            nb_variables_per_model=self.nb_variables_per_model,
+                            nb_stack_blocks=self.nb_stack_blocks,
+                            width=self.width,
+                            depth=self.depth,
+                            activation=self.activation,
+                            batch_norm=self.batch_norm,
+                            dropout_rate=self.dropout_rate)
 
         if self.validation_ratio > 0:
             X_train, X_val, y_train, y_val = \
@@ -211,6 +231,8 @@ class s3enEstimatorRegressor(BaseEstimator, RegressorMixin):
         if self._fitted is not True:
             raise RuntimeError(
                 "You must train classifer before predicting data!")
-        X_adjusted = [X[col['feat_nm']].values.reshape(-1, 1) for col in
-             self.feature_list]
+        X_adjusted, _ = adjust_data(X,
+                                    None,
+                                    self.feature_list,
+                                    self.target_replicas)
         return self.model.predict(X_adjusted)[:, 0]

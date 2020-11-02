@@ -52,7 +52,53 @@ def test_shape():
     assert len(y) == len(predictions)
 
 def test_classifier_accuracy():
-    model = s3enEstimator(feature_list)
+    model = s3enEstimator(feature_list=feature_list,
+                          target_type='classification',
+                          validation_ratio=0,
+                          patience=None,
+                          nb_models_per_stack=10,
+                          nb_variables_per_model=4,
+                          nb_stack_blocks=20,
+                          width=1,
+                          depth=1,
+                          epochs=300,
+                          batch_norm='no',
+                          dropout_rate=0
+                          )
+    model.fit(X, y)
+    assert np.mean((model.predict(X) > 0.5).astype(float) == y) >= 0.75
+
+def test_classifier_accuracy_patience():
+    model = s3enEstimator(feature_list=feature_list,
+                          target_type='classification',
+                          validation_ratio=0.1,
+                          patience=5,
+                          nb_models_per_stack=10,
+                          nb_variables_per_model=4,
+                          nb_stack_blocks=20,
+                          width=1,
+                          depth=1,
+                          epochs=1000,
+                          batch_norm='no',
+                          dropout_rate=0
+                          )
+    model.fit(X, y)
+    assert np.mean((model.predict(X) > 0.5).astype(float) == y) >= 0.75
+
+def test_classifier_accuracy_dropout_batchnorm():
+    model = s3enEstimator(feature_list=feature_list,
+                          target_type='classification',
+                          validation_ratio=0.2,
+                          patience=5,
+                          nb_models_per_stack=10,
+                          nb_variables_per_model=4,
+                          nb_stack_blocks=20,
+                          width=3,
+                          depth=1,
+                          epochs=2000,
+                          batch_norm='yes',
+                          dropout_rate=0.1
+                          )
     model.fit(X, y)
     assert np.mean((model.predict(X) > 0.5).astype(float) == y) >= 0.75
 
@@ -66,16 +112,27 @@ def test_classifier_accuracy_using_regression():
                           nb_stack_blocks=20,
                           width=1,
                           depth=1,
-                          epochs=300
+                          epochs=1000,
+                          batch_norm='no',
+                          dropout_rate=0
                           )
     model.fit(X, y)
     assert np.mean((model.predict(X) > 0.5).astype(float) == y) >= 0.75
 
-def test_classifier_accuracy_with_patience():
+def test_classifier_accuracy_using_regression_batchnorm_dropout():
     model = s3enEstimator(feature_list,
-                          target_type='classification',
-                          validation_ratio=0.2,
-                          patience=5)
+                          target_type='regression',
+                          validation_ratio=0,
+                          patience=3,
+                          nb_models_per_stack=10,
+                          nb_variables_per_model=5,
+                          nb_stack_blocks=20,
+                          width=2,
+                          depth=1,
+                          epochs=2000,
+                          batch_norm='yes',
+                          dropout_rate=0.2
+                          )
     model.fit(X, y)
     assert np.mean((model.predict(X) > 0.5).astype(float) == y) >= 0.75
 

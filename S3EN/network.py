@@ -3,24 +3,46 @@ import re
 import os
 import numpy as np
 from tensorflow.keras.layers import Dense,Input, Embedding, concatenate,\
-    Flatten, Average
+    Flatten, Average, Dropout, BatchNormalization, Activation
 from tensorflow.keras import Sequential, Model
 from tensorflow import config, distribute
 from S3EN.helpers import build_layers
 
-def dense_layers(model, dims, target_type, activation='relu'):
+def dense_layers(model,
+                 dims,
+                 target_type,
+                 activation,
+                 batch_norm,
+                 dropout_rate):
     nb_layers = len(dims)
     for i in range(nb_layers-1):
         if i < nb_layers - 2:
             act = activation
+            if batch_norm == 'yes':
+                model = \
+                    Dense(dims[i + 1],
+                          input_shape=(dims[i],),
+                          activation=None)(model)
+                model = BatchNormalization()(model)
+                model = Activation(act)(model)
+            else:
+                model = \
+                    Dense(dims[i + 1],
+                          input_shape=(dims[i],),
+                          activation=act)(model)
+            if dropout_rate > 0:
+                model = \
+                    Dropout(rate=dropout_rate,
+                            input_shape=(dims[i + 1],)
+                            )(model)
         else:
             if target_type == 'classification':
                 act = 'sigmoid'
             elif target_type == 'regression':
                 act = 'linear'
-        model = Dense(dims[i+1],\
-                      input_shape=(dims[i],),\
-                      activation=act)(model)
+            model = Dense(dims[i+1],\
+                          input_shape=(dims[i],),\
+                          activation=act)(model)
     return model
 
 def create_initial_layers(feature_list=None):
@@ -51,24 +73,54 @@ def create_initial_layers(feature_list=None):
 def concat(layers, in_or_out):
     return concatenate([layer[in_or_out] for layer in layers])
 
-def create_binary_classifier(tensors, out_dim, target_type, width, depth):
-    layer_dims = build_layers(out_dim, 1, width, depth)
-    prediction = dense_layers(concatenate(tensors), layer_dims, target_type)
+def create_subnetwork(tensors,
+                      out_dim,
+                      target_type,
+                      width,
+                      depth,
+                      activation,
+                      batch_norm,
+                      dropout_rate):
+    layer_dims = build_layers(out_dim,
+                              1,
+                              width,
+                              depth,
+                              dropout_rate)
+    prediction = dense_layers(concatenate(tensors),
+                              layer_dims,
+                              target_type,
+                              activation,
+                              batch_norm,
+                              dropout_rate)
     return {'in': tensors, 'out': prediction}
 
-def create_stacking_block(input_lists, target_type, width, depth):
+def create_stacking_block(input_lists,
+                          target_type,
+                          width,
+                          depth,
+                          activation,
+                          batch_norm,
+                          dropout_rate):
     outputs = []
     for input_list in input_lists:
         tensors = input_list['tensors']
         out_dim = input_list['out_dim']
         outputs.append(
-            create_binary_classifier(tensors,
-                                     out_dim,
-                                     target_type,
-                                     width,
-                                     depth)['out'])
+            create_subnetwork(tensors,
+                              out_dim,
+                              target_type,
+                              width,
+                              depth,
+                              activation,
+                              batch_norm,
+                              dropout_rate)['out'])
     layer_dims = build_layers(len(input_lists), 1, width, depth)
-    prediction = dense_layers(concatenate(outputs), layer_dims, target_type)
+    prediction = dense_layers(concatenate(outputs),
+                              layer_dims,
+                              target_type,
+                              activation,
+                              batch_norm,
+                              dropout_rate)
     stacking_loss = [prediction] + outputs
     return {'final_pred': prediction,
             'loss_output': concatenate(stacking_loss),
@@ -83,7 +135,10 @@ def create_ensemble(feature_list,
                     nb_variables_per_model=None,
                     nb_stack_blocks=5,
                     width=1,
-                    depth=1):
+                    depth=1,
+                    activation='elu',
+                    batch_norm='no',
+                    dropout_rate=0):
 
     if target_type == 'classification':
         loss = 'binary_crossentropy'
@@ -149,7 +204,10 @@ def create_ensemble(feature_list,
             stacking_output = create_stacking_block(input_lists,
                                                     target_type,
                                                     width,
-                                                    depth)
+                                                    depth,
+                                                    activation,
+                                                    batch_norm,
+                                                    dropout_rate)
             stacking_blocks_output.append(stacking_output)
 
         final = Average()(
